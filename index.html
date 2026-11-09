@@ -1,0 +1,716 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Module 7: Storage</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a storage rack. Sticky service tabs on top; each service is a "shelf" with its own color tag; tables and diagrams carry the facts. */
+:root {
+  --bg: #f3f5f7;
+  --surface: #ffffff;
+  --sunk: #e8ecf0;
+  --fg: #16202b;
+  --muted: #536173;
+  --line: #d3dae2;
+  --accent: #1f5fbf;
+  --ebs: #c2410c;
+  --s3: #15803d;
+  --efs: #7c3aed;
+  --glacier: #0e7490;
+  --ok: #15803d;
+  --bad: #b91c1c;
+  --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+  --radius: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f151c; --surface: #17202a; --sunk: #1e2935; --fg: #e6ebf1; --muted: #9aa8b8; --line: #2c3a49;
+    --accent: #6ea8ff; --ebs: #fb923c; --s3: #4ade80; --efs: #b794f6; --glacier: #38bdf8; --ok: #4ade80; --bad: #f87171;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f151c; --surface: #17202a; --sunk: #1e2935; --fg: #e6ebf1; --muted: #9aa8b8; --line: #2c3a49;
+  --accent: #6ea8ff; --ebs: #fb923c; --s3: #4ade80; --efs: #b794f6; --glacier: #38bdf8; --ok: #4ade80; --bad: #f87171;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } * { transition: none !important; animation: none !important; } }
+body {
+  background: var(--bg); color: var(--fg);
+  font-family: var(--body); font-size: 16px; line-height: 1.6;
+}
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 30; background: var(--surface); }
+.wrap {
+  max-width: 1080px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+h1, h2, h3 { font-family: var(--display); line-height: 1.1; text-wrap: balance; margin: 0; }
+h2 { font-size: clamp(1.9rem, 4vw, 2.6rem); font-weight: 800; letter-spacing: -0.01em; }
+h3 { font-size: 1.2rem; font-weight: 700; }
+p { margin: 0; max-width: 65ch; }
+a { color: var(--accent); }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+code, .mono { font-family: var(--mono); font-size: 0.92em; }
+.eyebrow { font-family: var(--mono); font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+
+/* nav */
+.nav {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20;
+  background: var(--surface); border-bottom: 1px solid var(--line);
+}
+.nav .wrap { display: flex; gap: 4px; overflow-x: auto; padding-block: 8px; scrollbar-width: none; }
+.nav a {
+  flex: none; text-decoration: none; color: var(--muted); font-size: 0.9rem; font-weight: 500;
+  padding: 6px 12px; border-radius: 999px; display: inline-flex; align-items: center; gap: 8px;
+}
+.nav a:hover { background: var(--sunk); color: var(--fg); }
+.nav a i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
+
+/* hero */
+.hero { padding-block: 56px 40px; display: grid; gap: 28px; }
+.hero h1 { font-size: clamp(2.6rem, 8vw, 5rem); font-weight: 800; letter-spacing: -0.02em; }
+.hero h1 span { color: var(--muted); font-weight: 500; }
+.hero .lede { font-size: 1.15rem; color: var(--muted); }
+.rack { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 760px) { .rack { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.unit {
+  display: grid; gap: 6px; text-decoration: none; color: var(--fg);
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 16px; border-top: 4px solid var(--c);
+  transition: transform .15s ease;
+}
+.unit:hover { transform: translateY(-2px); }
+.unit b { font-family: var(--display); font-size: 1.5rem; }
+.unit small { color: var(--muted); font-size: 0.85rem; line-height: 1.4; }
+.unit .kind { font-family: var(--mono); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--c); }
+
+/* sections */
+section.block { padding-block: 56px; border-top: 1px solid var(--line); }
+.head { display: grid; gap: 10px; margin-bottom: 28px; }
+.head .tag { display: inline-flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--c, var(--muted)); }
+.head .tag::before { content: ""; width: 10px; height: 10px; border-radius: 2px; background: var(--c, var(--muted)); }
+.head p { color: var(--muted); font-size: 1.05rem; }
+.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+@media (max-width: 820px) { .grid3 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 620px) { .grid2, .grid3 { grid-template-columns: minmax(0, 1fr); } }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; display: grid; gap: 10px; align-content: start; min-width: 0; }
+.card ul, .plain { margin: 0; padding-left: 1.1em; display: grid; gap: 4px; }
+.card li::marker { color: var(--c, var(--accent)); }
+.stack { display: grid; gap: 16px; }
+.sub { margin-top: 32px; display: grid; gap: 14px; }
+
+/* tables */
+.tbl { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+table { border-collapse: collapse; width: 100%; min-width: 560px; font-size: 0.95rem; }
+th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+tr:last-child td { border-bottom: 0; }
+thead th { font-family: var(--mono); font-size: 0.76rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-weight: 500; background: var(--sunk); }
+tbody th { font-weight: 600; color: var(--muted); font-size: 0.88rem; }
+td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.grp th { background: var(--surface); color: var(--fg); font-family: var(--display); font-size: 0.95rem; text-transform: none; letter-spacing: 0; }
+
+/* block vs object demo */
+.demo { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+@media (max-width: 620px) { .demo { grid-template-columns: minmax(0, 1fr); } }
+.cells { display: grid; grid-template-columns: repeat(16, 1fr); gap: 3px; }
+.cells span { aspect-ratio: 1; border-radius: 2px; background: var(--sunk); transition: background .3s ease; }
+.cells span.hit { background: var(--c); }
+.demo .card { --c: var(--accent); }
+.demo .result { font-family: var(--mono); font-size: 0.85rem; color: var(--muted); min-height: 1.5em; }
+.btn {
+  font: inherit; font-weight: 600; font-size: 0.95rem; cursor: pointer;
+  background: var(--accent); color: var(--bg); border: 0; border-radius: 8px; padding: 10px 16px;
+}
+.btn.ghost { background: transparent; color: var(--fg); border: 1px solid var(--line); }
+.row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+
+/* key facts */
+.facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 760px) { .facts { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.fact { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; display: grid; gap: 4px; }
+.fact b { font-family: var(--display); font-size: 1.7rem; color: var(--c); line-height: 1.1; }
+.fact span { color: var(--muted); font-size: 0.88rem; line-height: 1.4; }
+
+/* url anatomy */
+.url { font-family: var(--mono); font-size: clamp(0.8rem, 2.2vw, 1rem); background: var(--sunk); border-radius: 8px; padding: 14px; overflow-x: auto; white-space: nowrap; }
+.url .r { background: color-mix(in srgb, var(--s3) 22%, transparent); border-bottom: 2px solid var(--s3); padding: 1px 2px; }
+.url .b { background: color-mix(in srgb, var(--accent) 22%, transparent); border-bottom: 2px solid var(--accent); padding: 1px 2px; }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 0.85rem; color: var(--muted); }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+
+/* steps */
+ol.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; counter-reset: s; }
+ol.steps li { counter-increment: s; display: grid; grid-template-columns: 36px 1fr; gap: 12px; align-items: start; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; }
+ol.steps li::before { content: counter(s); font-family: var(--display); font-weight: 800; font-size: 1.1rem; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: var(--c); color: var(--bg); }
+
+/* efs diagram */
+.efs-diagram { display: grid; gap: 12px; background: var(--surface); border: 1px dashed var(--line); border-radius: var(--radius); padding: 18px; }
+.efs-diagram .vpc { font-family: var(--mono); font-size: 0.78rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+.azs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 560px) { .azs { grid-template-columns: minmax(0, 1fr); } }
+.az { border: 1px solid var(--line); border-radius: 8px; padding: 10px; display: grid; gap: 8px; background: var(--bg); }
+.az .t { font-family: var(--mono); font-size: 0.75rem; color: var(--muted); }
+.chip { font-size: 0.82rem; padding: 6px 8px; border-radius: 6px; background: var(--sunk); text-align: center; }
+.chip.mt { background: color-mix(in srgb, var(--efs) 18%, transparent); border: 1px solid var(--efs); }
+.fs { text-align: center; padding: 12px; border-radius: 8px; background: var(--efs); color: var(--bg); font-weight: 600; font-family: var(--display); }
+
+/* glacier retrieval */
+.ret { display: grid; gap: 12px; }
+.ret .r { display: grid; grid-template-columns: 110px 1fr 110px; gap: 12px; align-items: center; font-size: 0.92rem; }
+@media (max-width: 520px) { .ret .r { grid-template-columns: 90px 1fr; } .ret .r .v { grid-column: 2; } }
+.ret .bar { height: 12px; background: var(--sunk); border-radius: 999px; overflow: hidden; }
+.ret .bar span { display: block; height: 100%; background: var(--glacier); border-radius: 999px; }
+.ret .v { font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--muted); font-size: 0.85rem; }
+
+/* lifecycle */
+.flow { display: flex; flex-wrap: wrap; align-items: stretch; gap: 8px; }
+.flow .st { flex: 1 1 160px; background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--c); border-radius: 8px; padding: 14px; display: grid; gap: 4px; }
+.flow .st small { color: var(--muted); }
+.flow .ar { align-self: center; color: var(--muted); font-family: var(--mono); }
+@media (max-width: 620px) { .flow .ar { display: none; } }
+
+/* quiz */
+.quiz { display: grid; gap: 10px; }
+.opt { font: inherit; text-align: left; cursor: pointer; background: var(--surface); color: var(--fg); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; display: grid; grid-template-columns: 28px 1fr; gap: 10px; align-items: center; }
+.opt:hover { border-color: var(--accent); }
+.opt b { font-family: var(--mono); color: var(--muted); }
+.opt.right { border-color: var(--ok); background: color-mix(in srgb, var(--ok) 12%, var(--surface)); }
+.opt.wrong { border-color: var(--bad); background: color-mix(in srgb, var(--bad) 10%, var(--surface)); }
+.feedback { padding: 14px; border-radius: 8px; background: var(--sunk); }
+
+/* case studies */
+.case { --c: var(--accent); }
+.case .q { font-family: var(--mono); font-size: 0.85rem; color: var(--muted); }
+.pipeline { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 0.82rem; }
+.pipeline span { background: var(--sunk); border-radius: 6px; padding: 4px 8px; }
+.pipeline span.qq { background: transparent; border: 1px dashed var(--accent); color: var(--accent); font-weight: 600; }
+details { border-top: 1px solid var(--line); padding-top: 10px; }
+summary { cursor: pointer; font-weight: 600; color: var(--accent); }
+details p { margin-top: 8px; color: var(--muted); font-size: 0.95rem; }
+
+footer { border-top: 1px solid var(--line); padding-block: 32px 48px; color: var(--muted); font-size: 0.88rem; }
+footer .wrap { display: grid; gap: 8px; }
+</style>
+</head>
+<body>
+<nav class="nav" aria-label="Sections">
+  <div class="wrap">
+    <a href="#overview">Overview</a>
+    <a href="#ebs"><i style="background:var(--ebs)"></i>EBS</a>
+    <a href="#s3"><i style="background:var(--s3)"></i>S3</a>
+    <a href="#efs"><i style="background:var(--efs)"></i>EFS</a>
+    <a href="#glacier"><i style="background:var(--glacier)"></i>S3 Glacier</a>
+    <a href="#compare">Compare</a>
+    <a href="#cases">Case studies</a>
+    <a href="#check">Knowledge check</a>
+  </div>
+</nav>
+
+<header class="wrap hero" id="overview">
+  <div class="eyebrow">AWS Academy Cloud Foundations · Module 7</div>
+  <h1>Storage <span>on AWS</span></h1>
+  <p class="lede">Four services, four ways to keep data. This page walks through Amazon EBS, Amazon S3, Amazon EFS, and Amazon S3 Glacier: what each one is, what it costs, and when to pick it.</p>
+  <div class="rack">
+    <a class="unit" href="#ebs" style="--c:var(--ebs)"><span class="kind">Block</span><b>EBS</b><small>Volumes you attach to an EC2 instance</small></a>
+    <a class="unit" href="#s3" style="--c:var(--s3)"><span class="kind">Object</span><b>S3</b><small>Objects in buckets, reachable by URL</small></a>
+    <a class="unit" href="#efs" style="--c:var(--efs)"><span class="kind">File</span><b>EFS</b><small>Shared NFS file system for many instances</small></a>
+    <a class="unit" href="#glacier" style="--c:var(--glacier)"><span class="kind">Archive</span><b>S3 Glacier</b><small>Low-cost, long-term archiving</small></a>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="grid2" style="padding-bottom:48px">
+    <div class="card">
+      <h3>Module objectives</h3>
+      <ul class="plain">
+        <li>Identify the different types of storage</li>
+        <li>Explain Amazon S3 and identify its functionality</li>
+        <li>Explain Amazon EBS and identify its functionality</li>
+        <li>Perform functions in Amazon EBS to build an Amazon EC2 storage solution</li>
+        <li>Explain Amazon EFS and identify its functionality</li>
+        <li>Explain Amazon S3 Glacier and identify its functionality</li>
+        <li>Differentiate between Amazon EBS, Amazon S3, Amazon EFS, and Amazon S3 Glacier</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>What's in the module</h3>
+      <ul class="plain">
+        <li><b>Demos:</b> Amazon EBS, Amazon S3, Amazon EFS, and Amazon S3 Glacier consoles</li>
+        <li><b>Lab 4:</b> Working with Amazon EBS (about 30 minutes)</li>
+        <li><b>Activity:</b> Storage solution case studies</li>
+        <li><b>Builds on:</b> Amazon VPC, Amazon EC2, and IAM from earlier modules</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Block vs object -->
+  <section class="block" id="types">
+    <div class="head">
+      <span class="tag">Storage types</span>
+      <h2>Block storage versus object storage</h2>
+      <p>What if you want to change one character in a 1-GB file? Press the button to see how much data each storage type has to rewrite.</p>
+    </div>
+    <div class="demo">
+      <div class="card" style="--c:var(--ebs)">
+        <h3>Block storage</h3>
+        <div class="cells" id="cellsBlock" aria-hidden="true"></div>
+        <div class="result" id="resBlock">The file is split into blocks.</div>
+      </div>
+      <div class="card" style="--c:var(--s3)">
+        <h3>Object storage</h3>
+        <div class="cells" id="cellsObj" aria-hidden="true"></div>
+        <div class="result" id="resObj">The file is one object.</div>
+      </div>
+    </div>
+    <div class="row" style="margin-top:16px">
+      <button class="btn" id="editBtn" type="button">Change one character</button>
+      <button class="btn ghost" id="resetBtn" type="button">Reset</button>
+    </div>
+    <p style="margin-top:16px;color:var(--muted)">Block storage solutions are typically faster and use less bandwidth, but they can cost more than object-level storage. The choice affects throughput, latency, and cost.</p>
+  </section>
+
+  <!-- EBS -->
+  <section class="block" id="ebs" style="--c:var(--ebs)">
+    <div class="head">
+      <span class="tag">Section 1</span>
+      <h2>Amazon Elastic Block Store (EBS)</h2>
+      <p>Amazon EBS lets you create individual storage volumes and attach them to an Amazon EC2 instance. It offers block-level storage, volumes are automatically replicated within their Availability Zone, and they can be backed up to Amazon S3 through snapshots.</p>
+    </div>
+
+    <div class="grid3">
+      <div class="card"><h3>Snapshots</h3><ul><li>Point-in-time snapshots</li><li>Recreate a new volume at any time</li></ul></div>
+      <div class="card"><h3>Encryption</h3><ul><li>Encrypted Amazon EBS volumes</li><li>No additional cost</li></ul></div>
+      <div class="card"><h3>Elasticity</h3><ul><li>Increase capacity</li><li>Change to different types</li></ul></div>
+    </div>
+
+    <div class="sub">
+      <h3>Common uses</h3>
+      <div class="grid2">
+        <div class="card"><ul><li>Boot volumes and storage for Amazon EC2 instances</li><li>Data storage with a file system</li></ul></div>
+        <div class="card"><ul><li>Database hosts</li><li>Enterprise applications</li></ul></div>
+      </div>
+    </div>
+
+    <div class="sub">
+      <h3>Volume types</h3>
+      <div class="tbl">
+        <table>
+          <thead>
+            <tr class="grp"><th></th><th colspan="2">Solid State Drives (SSD)</th><th colspan="2">Hard Disk Drives (HDD)</th></tr>
+            <tr><th></th><th>General Purpose</th><th>Provisioned IOPS</th><th>Throughput-Optimized</th><th>Cold</th></tr>
+          </thead>
+          <tbody>
+            <tr><th>Max volume size</th><td class="num">16 TiB</td><td class="num">16 TiB</td><td class="num">16 TiB</td><td class="num">16 TiB</td></tr>
+            <tr><th>Max IOPS / volume</th><td class="num">16,000</td><td class="num">64,000</td><td class="num">500</td><td class="num">250</td></tr>
+            <tr><th>Max throughput / volume</th><td class="num">250 MiB/s</td><td class="num">1,000 MiB/s</td><td class="num">500 MiB/s</td><td class="num">250 MiB/s</td></tr>
+            <tr><th>Best for</th><td>Most workloads: boot volumes, virtual desktops, low-latency interactive apps, dev and test</td><td>Critical apps needing sustained IOPS, over 16,000 IOPS or 250 MiB/s; large databases</td><td>Streaming workloads: big data, data warehouses, log processing</td><td>Large, infrequently accessed data where lowest cost matters</td></tr>
+            <tr><th>Boot volume?</th><td>Yes</td><td>Yes</td><td>No</td><td>No</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="color:var(--muted)">Only SSD volumes can be boot volumes. Provisioned IOPS gives the highest performance, but General Purpose is usually enough.</p>
+    </div>
+
+    <div class="sub">
+      <h3>Pricing</h3>
+      <div class="grid2">
+        <div class="card">
+          <h3>Volumes and IOPS</h3>
+          <ul>
+            <li>Volumes persist independently from the instance and are charged by the amount provisioned per month.</li>
+            <li><b>General Purpose SSD:</b> GB provisioned per month until storage is released.</li>
+            <li><b>Magnetic:</b> number of requests to the volume.</li>
+            <li><b>Provisioned IOPS SSD:</b> IOPS provisioned, times the percentage of days provisioned that month.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Snapshots and data transfer</h3>
+          <ul>
+            <li>Snapshots stored in Amazon S3 cost per GB-month of data stored.</li>
+            <li>Inbound data transfer is free.</li>
+            <li>Outbound data transfer across Regions incurs charges.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="sub">
+      <h3>Lab 4: Working with Amazon EBS</h3>
+      <ol class="steps">
+        <li>Create an Amazon EBS volume.</li>
+        <li>Attach the volume to an Amazon EC2 instance.</li>
+        <li>Configure the instance to use the volume as a virtual disk.</li>
+        <li>Create a snapshot of the volume.</li>
+        <li>Restore from the snapshot.</li>
+      </ol>
+    </div>
+
+    <div class="sub card">
+      <span class="eyebrow">Key takeaways</span>
+      <ul>
+        <li>Persistent and customizable block storage for Amazon EC2</li>
+        <li>HDD and SSD types, replicated in the same Availability Zone</li>
+        <li>Easy and transparent encryption, elastic volumes, backups through snapshots</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- S3 -->
+  <section class="block" id="s3" style="--c:var(--s3)">
+    <div class="head">
+      <span class="tag">Section 2</span>
+      <h2>Amazon Simple Storage Service (S3)</h2>
+      <p>A fully managed cloud storage service. Data is stored as objects in buckets, you get granular access control on both, and you pay only for what you use.</p>
+    </div>
+
+    <div class="facts">
+      <div class="fact"><b>11 9s</b><span>Designed durability (99.999999999%)</span></div>
+      <div class="fact"><b>5 TB</b><span>Maximum size of a single object</span></div>
+      <div class="fact"><b>Unlimited</b><span>Virtually unlimited total storage</span></div>
+      <div class="fact"><b>3+</b><span>Facilities in the Region store each object redundantly</span></div>
+    </div>
+
+    <div class="sub">
+      <h3>Storage classes</h3>
+      <div class="tbl">
+        <table>
+          <thead><tr><th>Class</th><th>Designed for</th></tr></thead>
+          <tbody>
+            <tr><td><b>S3 Standard</b></td><td>Frequently accessed data. 11 9s durability, four 9s availability.</td></tr>
+            <tr><td><b>S3 Intelligent-Tiering</b></td><td>Data with unknown or changing access patterns.</td></tr>
+            <tr><td><b>S3 Standard-IA</b></td><td>Infrequently accessed data. 11 9s durability, three 9s availability.</td></tr>
+            <tr><td><b>S3 One Zone-IA</b></td><td>Infrequently accessed data kept in a single Availability Zone.</td></tr>
+            <tr><td><b>S3 Glacier</b></td><td>Low-cost archiving with retrieval in minutes to hours.</td></tr>
+            <tr><td><b>S3 Glacier Deep Archive</b></td><td>The lowest-cost class for long-term retention.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="sub">
+      <h3>Bucket URLs come in two styles</h3>
+      <p style="color:var(--muted)">Create a bucket in an AWS Region, then upload almost any number of objects to it.</p>
+      <div class="card">
+        <span class="eyebrow">Path-style</span>
+        <div class="url">https://<span class="r">s3.ap-northeast-1</span>.amazonaws.com/<span class="b">bucket-name</span></div>
+        <span class="eyebrow">Virtual hosted-style</span>
+        <div class="url">https://<span class="b">bucket-name</span>.<span class="r">s3-ap-northeast-1</span>.amazonaws.com</div>
+        <div class="legend"><span><i style="background:var(--s3)"></i>Region code</span><span><i style="background:var(--accent)"></i>Bucket name</span></div>
+      </div>
+    </div>
+
+    <div class="sub">
+      <div class="grid3">
+        <div class="card">
+          <h3>Access it anywhere</h3>
+          <ul><li>AWS Management Console</li><li>AWS Command Line Interface</li><li>SDKs</li></ul>
+        </div>
+        <div class="card">
+          <h3>Common use cases</h3>
+          <ul><li>Storing application assets</li><li>Static web hosting</li><li>Backup and disaster recovery</li><li>Staging area for big data</li></ul>
+        </div>
+        <div class="card">
+          <h3>Common scenarios</h3>
+          <ul><li>Backup and storage</li><li>Application hosting</li><li>Media hosting</li><li>Software delivery</li></ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="sub">
+      <h3>Pricing</h3>
+      <div class="grid2">
+        <div class="card">
+          <h3>You pay for</h3>
+          <ul>
+            <li>GBs stored per month, based on storage class and the number and size of objects</li>
+            <li>Transfer OUT to other Regions</li>
+            <li>PUT, COPY, POST, LIST, and GET requests (GET has a different rate)</li>
+          </ul>
+        </div>
+        <div class="card" style="--c:var(--ok)">
+          <h3>You don't pay for</h3>
+          <ul>
+            <li>Transfers IN to Amazon S3</li>
+            <li>Transfers OUT to Amazon CloudFront or Amazon EC2 in the same Region</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="sub card">
+      <span class="eyebrow">Key takeaways</span>
+      <ul>
+        <li>Fully managed, virtually unlimited object storage</li>
+        <li>Pay only for what you use</li>
+        <li>Accessible any time, from anywhere, through a URL</li>
+        <li>Rich security controls</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- EFS -->
+  <section class="block" id="efs" style="--c:var(--efs)">
+    <div class="head">
+      <span class="tag">Section 3</span>
+      <h2>Amazon Elastic File System (EFS)</h2>
+      <p>File storage in the AWS Cloud: a petabyte-scale, low-latency, shared file system with elastic capacity. It supports NFS versions 4.0 and 4.1 and works with all Linux-based AMIs for Amazon EC2.</p>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <h3>Works well for</h3>
+        <ul><li>Big data and analytics</li><li>Media processing workflows</li><li>Content management and web serving</li><li>Home directories</li></ul>
+      </div>
+      <div class="efs-diagram" role="img" aria-label="An EFS file system inside a VPC with one mount target in each of three Availability Zones, each serving EC2 instances.">
+        <span class="vpc">VPC</span>
+        <div class="azs">
+          <div class="az"><span class="t">Availability Zone A</span><div class="chip">EC2 instances</div><div class="chip mt">Mount target</div></div>
+          <div class="az"><span class="t">Availability Zone B</span><div class="chip">EC2 instances</div><div class="chip mt">Mount target</div></div>
+          <div class="az"><span class="t">Availability Zone C</span><div class="chip">EC2 instances</div><div class="chip mt">Mount target</div></div>
+        </div>
+        <div class="fs">Elastic File System</div>
+      </div>
+    </div>
+
+    <div class="sub">
+      <h3>Implementation</h3>
+      <ol class="steps">
+        <li>Create your Amazon EC2 resources and launch your instance.</li>
+        <li>Create your Amazon EFS file system.</li>
+        <li>Create mount targets in the appropriate subnets.</li>
+        <li>Connect your EC2 instances to the mount targets.</li>
+        <li>Verify the resources and protection of your AWS account.</li>
+      </ol>
+    </div>
+
+    <div class="sub">
+      <h3>Resources</h3>
+      <div class="grid3">
+        <div class="card"><h3>File system</h3><ul><li>Has one or more mount targets</li><li>Tags: key-value pairs</li></ul></div>
+        <div class="card"><h3>Mount target</h3><ul><li>Created in a VPC subnet</li><li>One per Availability Zone</li><li>Must be in the same VPC</li></ul></div>
+        <div class="card"><h3>Needs</h3><ul><li>Subnet ID</li><li>Security groups</li></ul></div>
+      </div>
+    </div>
+
+    <div class="sub card">
+      <span class="eyebrow">Key takeaways</span>
+      <ul>
+        <li>File storage over a network, fully managed</li>
+        <li>Accessible from the console, an API, or the CLI</li>
+        <li>Scales up or down as files are added or removed; you pay for what you use</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- Glacier -->
+  <section class="block" id="glacier" style="--c:var(--glacier)">
+    <div class="head">
+      <span class="tag">Section 4</span>
+      <h2>Amazon S3 Glacier</h2>
+      <p>A data archiving service designed for security, durability, and extremely low cost. Pricing is based on Region, and it works well for long-term archiving and backup.</p>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <h3>Highlights</h3>
+        <ul>
+          <li>Designed for 11 9s of durability</li>
+          <li>Encrypts data in transit (SSL/TLS) and at rest</li>
+          <li>Vault Lock enforces compliance through a policy</li>
+          <li>Lifecycle rules can archive Amazon S3 content to S3 Glacier</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Retrieval options</h3>
+        <div class="ret">
+          <div class="r"><span>Expedited</span><div class="bar"><span style="width:4%"></span></div><span class="v">1–5 min</span></div>
+          <div class="r"><span>Standard</span><div class="bar"><span style="width:42%"></span></div><span class="v">3–5 hours</span></div>
+          <div class="r"><span>Bulk</span><div class="bar"><span style="width:100%"></span></div><span class="v">5–12 hours</span></div>
+        </div>
+        <small style="color:var(--muted)">Bars show the upper end of each range, on a 12-hour scale.</small>
+      </div>
+    </div>
+
+    <div class="sub">
+      <h3>Lifecycle policies</h3>
+      <p style="color:var(--muted)">Amazon S3 lifecycle policies delete or move objects based on age.</p>
+      <div class="flow">
+        <div class="st" style="--c:var(--s3)"><b>S3 Standard</b><small>New, frequently used data</small></div>
+        <span class="ar">→</span>
+        <div class="st" style="--c:var(--accent)"><b>S3 Standard-IA</b><small>Older, accessed less often</small></div>
+        <span class="ar">→</span>
+        <div class="st" style="--c:var(--glacier)"><b>S3 Glacier</b><small>Archived for the long term</small></div>
+      </div>
+    </div>
+
+    <div class="sub">
+      <div class="grid2">
+        <div class="card">
+          <h3>Use cases</h3>
+          <ul><li>Media asset archiving</li><li>Healthcare information archiving</li><li>Regulatory and compliance archiving</li><li>Scientific data archiving</li><li>Digital preservation</li><li>Magnetic tape replacement</li></ul>
+        </div>
+        <div class="card">
+          <h3>How to use it</h3>
+          <ul><li>RESTful web services</li><li>Java or .NET SDKs</li><li>Amazon S3 with lifecycle policies</li></ul>
+          <h3 style="margin-top:8px">Security</h3>
+          <ul><li>Control access with IAM</li><li>Data encrypted with AES-256</li><li>S3 Glacier manages your keys for you</li></ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="sub">
+      <h3>Amazon S3 versus Amazon S3 Glacier</h3>
+      <div class="tbl">
+        <table>
+          <thead><tr><th></th><th>Amazon S3</th><th>Amazon S3 Glacier</th></tr></thead>
+          <tbody>
+            <tr><th>Data volume</th><td>No limit</td><td>No limit</td></tr>
+            <tr><th>Average latency</th><td>Milliseconds</td><td>Minutes to hours</td></tr>
+            <tr><th>Item size</th><td class="num">5 TB max</td><td class="num">40 TB max</td></tr>
+            <tr><th>Cost per GB-month</th><td>Higher</td><td>Lower</td></tr>
+            <tr><th>Billed requests</th><td>PUT, COPY, POST, LIST, GET</td><td>UPLOAD and retrieval</td></tr>
+            <tr><th>Retrieval pricing</th><td>Per request</td><td>Per request and per GB (higher)</td></tr>
+            <tr><th>Server-side encryption</th><td>Your application must enable it</td><td>On by default</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- Compare -->
+  <section class="block" id="compare">
+    <div class="head">
+      <span class="tag">Wrap-up</span>
+      <h2>Which storage service fits?</h2>
+      <p>A side-by-side summary of the four services, drawn from the sections above.</p>
+    </div>
+    <div class="tbl">
+      <table>
+        <thead><tr><th></th><th style="color:var(--ebs)">EBS</th><th style="color:var(--s3)">S3</th><th style="color:var(--efs)">EFS</th><th style="color:var(--glacier)">S3 Glacier</th></tr></thead>
+        <tbody>
+          <tr><th>Storage type</th><td>Block</td><td>Object</td><td>File (NFS)</td><td>Object (archive)</td></tr>
+          <tr><th>Attached to</th><td>An EC2 instance</td><td>Accessed by URL, CLI, or SDK</td><td>Many EC2 instances at once</td><td>Through S3 lifecycle, REST, or SDK</td></tr>
+          <tr><th>Scope</th><td>One Availability Zone</td><td>Across facilities in a Region</td><td>Mount target in each AZ</td><td>Region</td></tr>
+          <tr><th>Access speed</th><td>Low latency</td><td>Milliseconds</td><td>Low latency</td><td>Minutes to hours</td></tr>
+          <tr><th>Size</th><td class="num">Up to 16 TiB per volume</td><td class="num">Unlimited; 5 TB per object</td><td>Petabyte scale</td><td class="num">Unlimited; 40 TB per archive</td></tr>
+          <tr><th>Pick it for</th><td>Boot volumes, databases</td><td>App assets, static sites, backups</td><td>Shared files, home directories</td><td>Long-term, rarely accessed data</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Cases -->
+  <section class="block" id="cases">
+    <div class="head">
+      <span class="tag">Activity</span>
+      <h2>Storage case studies</h2>
+      <p>In groups of four or five, pick the best storage solution for your case. Explain the key factors you considered and anything that could change your recommendation.</p>
+    </div>
+    <div class="grid3">
+      <div class="card case">
+        <span class="q">Case 1</span>
+        <h3>Travel analytics</h3>
+        <p>A data analytics company for travel sites must store billions of customer events per day.</p>
+        <div class="pipeline"><span>API Gateway</span><span>Kinesis</span><span>Kinesis Data Firehose</span><span>Lambda</span><span>ECS</span><span class="qq">Storage ??</span></div>
+        <details><summary>Hint</summary><p>Think about a store that scales without limit, takes data from Firehose, and serves as a staging area for big data.</p></details>
+      </div>
+      <div class="card case">
+        <span class="q">Case 2</span>
+        <h3>Enterprise email</h3>
+        <p>A collaboration software company processes email for 250+ enterprise customers and 500,000+ users, storing petabytes of data.</p>
+        <div class="pipeline"><span>Corporate data center</span><span>Elastic Load Balancing</span><span>EC2 instances</span><span class="qq">Storage ??</span></div>
+        <details><summary>Hint</summary><p>Consider how much data there is, how often old mail is read, and whether lifecycle rules could lower cost.</p></details>
+      </div>
+      <div class="card case">
+        <span class="q">Case 3</span>
+        <h3>Data protection</h3>
+        <p>A data protection company ingests large amounts of customer data and must help customers meet compliance requirements.</p>
+        <div class="pipeline"><span>Clients</span><span>EC2</span><span>DynamoDB</span><span class="qq">Storage ??</span></div>
+        <details><summary>Hint</summary><p>Compliance and long retention point toward durability, encryption, and features like Vault Lock.</p></details>
+      </div>
+    </div>
+  </section>
+
+  <!-- Knowledge check -->
+  <section class="block" id="check">
+    <div class="head">
+      <span class="tag">Knowledge check</span>
+      <h2>Sample exam question</h2>
+      <p>A company wants to store data that is not frequently accessed. What is the best and most cost-effective solution to consider?</p>
+    </div>
+    <div class="quiz" id="quiz">
+      <button class="opt" type="button" data-k="A"><b>A</b>AWS Storage Gateway</button>
+      <button class="opt" type="button" data-k="B"><b>B</b>Amazon Simple Storage Service Glacier</button>
+      <button class="opt" type="button" data-k="C"><b>C</b>Amazon Elastic Block Store (Amazon EBS)</button>
+      <button class="opt" type="button" data-k="D"><b>D</b>Amazon Simple Storage Service (Amazon S3)</button>
+      <div class="feedback" id="fb" hidden></div>
+    </div>
+  </section>
+
+  <section class="block" id="resources">
+    <div class="head">
+      <span class="tag">Further reading</span>
+      <h2>Additional resources</h2>
+    </div>
+    <ul class="plain">
+      <li><a href="https://aws.amazon.com/products/storage/" target="_blank" rel="noopener">AWS Storage page</a></li>
+      <li><a href="https://docs.aws.amazon.com/whitepapers/latest/aws-overview/storage-services.html" target="_blank" rel="noopener">Storage overview (AWS whitepaper)</a></li>
+      <li><a href="https://aws.amazon.com/blogs/compute/recovering-files-from-an-amazon-ebs-volume-backup/" target="_blank" rel="noopener">Recovering files from an Amazon EBS volume backup</a></li>
+      <li><a href="https://dzone.com/articles/confused-by-aws-storage-options-s3-ebs-amp-efs-explained" target="_blank" rel="noopener">Confused by AWS storage options? S3, EFS, EBS explained</a></li>
+    </ul>
+  </section>
+</div>
+
+<footer>
+  <div class="wrap">
+    <span>Study site for AWS Academy Cloud Foundations, Module 7: Storage. Built from the course slides for ISDS 3100.</span>
+    <span>All trademarks are the property of their owners.</span>
+  </div>
+</footer>
+
+<script>
+(function () {
+  var N = 64, TARGET = 37;
+  var cb = document.getElementById('cellsBlock'), co = document.getElementById('cellsObj');
+  for (var i = 0; i < N; i++) { cb.appendChild(document.createElement('span')); co.appendChild(document.createElement('span')); }
+  var rb = document.getElementById('resBlock'), ro = document.getElementById('resObj');
+  document.getElementById('editBtn').addEventListener('click', function () {
+    cb.children[TARGET].classList.add('hit');
+    Array.prototype.forEach.call(co.children, function (c) { c.classList.add('hit'); });
+    rb.textContent = 'Rewrote 1 of 64 blocks (~16 MB)';
+    ro.textContent = 'Rewrote the entire 1 GB object';
+  });
+  document.getElementById('resetBtn').addEventListener('click', function () {
+    document.querySelectorAll('.cells span').forEach(function (c) { c.classList.remove('hit'); });
+    rb.textContent = 'The file is split into blocks.';
+    ro.textContent = 'The file is one object.';
+  });
+
+  var fb = document.getElementById('fb');
+  document.querySelectorAll('#quiz .opt').forEach(function (b) {
+    b.addEventListener('click', function () {
+      document.querySelectorAll('#quiz .opt').forEach(function (o) { o.classList.remove('right', 'wrong'); });
+      var ok = b.dataset.k === 'B';
+      b.classList.add(ok ? 'right' : 'wrong');
+      if (!ok) document.querySelector('#quiz .opt[data-k="B"]').classList.add('right');
+      fb.hidden = false;
+      fb.innerHTML = (ok ? '<b>Correct.</b> ' : '<b>Not quite.</b> ') +
+        'The keywords are “not frequently accessed” and “cost-effective.” The answer is <b>B, Amazon S3 Glacier</b>.';
+    });
+  });
+})();
+</script>
+</body>
+</html>
