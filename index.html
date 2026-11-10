@@ -126,6 +126,13 @@ h1 em { font-style: normal; color: var(--muted); font-weight: 500; }
 .slide h3 { font-family: var(--body); font-weight: 600; font-size: 1.15rem; margin: 0 0 8px; line-height: 1.35; }
 .say { display: grid; gap: 12px; }
 .say p { margin: 0; font-size: var(--size); max-width: 68ch; }
+.say ul.obj { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 18px; font-size: calc(var(--size) * .94); }
+@media (max-width: 620px) { .say ul.obj { grid-template-columns: minmax(0, 1fr); } }
+.say ul.obj li { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 6px; align-items: baseline; }
+.say ul.obj li::before { content: ""; width: 8px; height: 8px; border-radius: 2px; background: var(--c); transform: translateY(-1px); }
+.say ul.obj li.ebs::before { background: var(--ebs); }
+.say ul.obj li.s3::before { background: var(--s3); }
+.p-inner .say ul.obj { font-size: calc(var(--size) * 1.15); }
 .cue { justify-self: start; font-size: .88rem; font-style: italic; color: var(--muted); background: var(--note-bg); border-radius: 999px; padding: 3px 12px; }
 
 footer { border-top: 1px solid var(--line); margin-top: 32px; padding-block: 28px 56px; color: var(--muted); font-size: .9rem; }
@@ -227,10 +234,10 @@ footer { border-top: 1px solid var(--line); margin-top: 32px; padding-block: 28p
         <div class="hero-inner">
           <div class="kicker">AWS Academy Cloud Foundations · Module 7: Storage</div>
           <h1>Amazon EBS <em>&amp;</em> Amazon S3</h1>
-          <p class="lede">Speaker script for Sections 1 and 2, slides 4 to 35. Each card is one slide: read the text, and follow the grey notes for pauses and videos.</p>
+          <p class="lede">Speaker script for the module opening and Sections 1 and 2, slides 2 to 35. Each card is one slide: read the text, and follow the grey notes for pauses and videos.</p>
           <div class="cta">
             <button class="btn" type="button" id="startPresent"><svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M4 2.5v11l9-5.5z"/></svg>Start presenter mode</button>
-            <span class="hero-meta"><b>32 slides</b> · <b>20–25 min</b> read aloud, not counting demos or the lab</span>
+            <span class="hero-meta"><b>34 slides</b> · <b>about 25 min</b> read aloud, not counting demos or the lab</span>
           </div>
         </div>
       </div>
@@ -263,7 +270,37 @@ footer { border-top: 1px solid var(--line); margin-top: 32px; padding-block: 28p
 
     <!-- INTRO -->
     <section class="part" style="--c:var(--intro)">
-      <div class="band soft" style="grid-template-columns:minmax(0,1fr)"><span class="tag">Introduction · Slide 4</span><h2>Where storage fits</h2></div>
+      <div class="band soft" style="grid-template-columns:minmax(0,1fr)"><span class="tag">Introduction · Slides 2–4</span><h2>Module overview</h2></div>
+      <div class="group">What this module covers</div>
+
+      <article class="slide" id="s2"><div class="num">02</div><div class="say">
+        <h3>Module overview</h3>
+        <p>Welcome to Module 7, which is all about storage. Compared with traditional on-premises storage, cloud storage is usually more reliable, easier to scale, and more secure. It's also a key part of cloud computing, because it holds the data that applications depend on. Big data analytics, data warehouses, the Internet of Things, databases, and backup and archive systems all need some kind of storage behind them.</p>
+        <p>This module covers four main services: Amazon Elastic Block Store, or Amazon EBS; Amazon Simple Storage Service, or Amazon S3; Amazon Elastic File System, or Amazon EFS; and Amazon S3 Glacier.</p>
+        <p>Along the way, there are four recorded demos that show how to set up these storage services in the AWS Management Console. There's also a hands-on lab, Lab 4, where you'll create an EBS volume, attach it to an EC2 instance, take a snapshot of it, and then use that snapshot to create a new volume.</p>
+        <p>After that, there's a group activity where you'll pick the best storage solution for a business case. The module wraps up with a knowledge check to test your understanding of the key ideas.</p>
+      </div></article>
+
+      <article class="slide" id="s3"><div class="num">03</div><div class="say">
+        <h3>Module objectives</h3>
+        <p>The goal of this module is to understand the key ideas behind storage on AWS. We'll look at the different kinds of storage that are available and go over their pricing, so you can see how your choices affect the total cost of a solution.</p>
+        <p>By the end of the module, you should be able to:</p>
+        <ul class="obj">
+          <li>Identify the different types of storage</li>
+          <li class="s3">Explain Amazon S3</li>
+          <li class="s3">Identify the functionality in Amazon S3</li>
+          <li class="ebs">Explain Amazon EBS</li>
+          <li class="ebs">Identify the functionality in Amazon EBS</li>
+          <li class="ebs">Perform functions in Amazon EBS to build an Amazon EC2 storage solution</li>
+          <li>Explain Amazon EFS</li>
+          <li>Identify the functionality in Amazon EFS</li>
+          <li>Explain Amazon S3 Glacier</li>
+          <li>Identify the functionality in Amazon S3 Glacier</li>
+          <li>Differentiate between Amazon EBS, Amazon S3, Amazon EFS, and Amazon S3 Glacier</li>
+        </ul>
+        <p>The objectives marked in orange and green are the ones my sections will cover: orange for EBS and green for S3.</p>
+      </div></article>
+
       <div class="group">Core services</div>
 
       <article class="slide" id="s4"><div class="num">04</div><div class="say">
@@ -697,7 +734,7 @@ footer { border-top: 1px solid var(--line); margin-top: 32px; padding-block: 28p
 (function () {
   var rail = document.getElementById('rail');
   var parts = [
-    { name: 'Intro', c: 'var(--intro)', from: 4, to: 4 },
+    { name: 'Intro', c: 'var(--intro)', from: 2, to: 4 },
     { name: 'Section 1 · EBS', c: 'var(--ebs)', from: 5, to: 20 },
     { name: 'Section 2 · S3', c: 'var(--s3)', from: 21, to: 35 }
   ];
